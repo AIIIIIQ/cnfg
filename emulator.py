@@ -18,8 +18,19 @@ class ShellEmulator:
 
     def _load_tar_to_memory(self):
         with tarfile.open(self.tar_path, "r") as tar:
+            # Получаем общий префикс для всех путей в архиве
+            all_names = [member.name for member in tar.getmembers()]
+            common_prefix = os.path.commonprefix(all_names)
+            # Убираем конечный '/', если есть
+            common_prefix = common_prefix.rstrip('/')
+            prefix_len = len(common_prefix)
             for member in tar.getmembers():
-                path_parts = member.name.split("/")
+                # Убираем общий префикс из пути
+                relative_name = member.name[prefix_len:].lstrip('/')
+                path_parts = relative_name.split('/')
+                # Пропускаем пустые пути
+                if not path_parts or path_parts == ['']:
+                    continue
                 current = self.vfs
                 for part in path_parts[:-1]:
                     if part not in current:
@@ -44,8 +55,6 @@ class ShellEmulator:
             try:
                 prompt = "/" + "/".join(self.current_path) if self.current_path else "/"
                 command = input(f"{prompt}> ").strip()
-                if command == "exit":
-                    break
                 self._handle_command(command)
             except Exception as e:
                 print(f"Error: {e}")
@@ -64,6 +73,8 @@ class ShellEmulator:
             self.cal()
         elif cmd == "chmod":
             self.chmod(args)
+        elif cmd == "exit":
+            raise SystemExit
         else:
             print(f"Command '{cmd}' not found.")
 
@@ -110,7 +121,11 @@ class ShellEmulator:
             except FileNotFoundError as e:
                 print(e)
 
-    def chmod(self):
+    def chmod(self, args):
+        if len(args) != 2:
+            print("chmod: missing operand")
+            return
+
         mode, file_name = args
 
         # Проверяем, что mode состоит из 3 цифр, каждая из которых от 0 до 7
